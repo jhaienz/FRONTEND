@@ -622,6 +622,8 @@ export function AdminResearchPanel({ statusFilter = "" }: { statusFilter?: strin
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [activeStatus, setActiveStatus] = useState(statusFilter)
+  const [aiResult, setAiResult] = useState<{ paperId: string; type: string; text: string } | null>(null)
+  const [isAiPending, startAiTransition] = useTransition()
 
   function load(status: string) {
     const query = status ? `?status=${status}&limit=50` : "?limit=50"
@@ -675,6 +677,26 @@ export function AdminResearchPanel({ statusFilter = "" }: { statusFilter?: strin
     } else {
       startTransition(async () => { await clientAction(`/research/${id}/approve`, "PATCH"); load(activeStatus) })
     }
+  }
+
+  function runAi(paper: ResearchSummary, type: "summarize" | "suggest-rejection" | "suggest-tags") {
+    setAiResult(null)
+    startAiTransition(async () => {
+      try {
+        const { result } = await clientAction<{ result: string }>(
+          `/ai/${type}`,
+          "POST",
+          { title: paper.title, abstract: paper.abstract ?? "" },
+        )
+        setAiResult({ paperId: paper.id, type, text: result })
+      } catch (err) {
+        setAiResult({
+          paperId: paper.id,
+          type,
+          text: err instanceof Error ? err.message : "AI request failed",
+        })
+      }
+    })
   }
 
   const statusTabs = [
@@ -746,6 +768,69 @@ export function AdminResearchPanel({ statusFilter = "" }: { statusFilter?: strin
                 </span>
               </div>
               <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{paper.abstract}</p>
+
+              {/* AI Assistant — only for pending papers with an abstract */}
+              {paper.status === "pending" && paper.abstract && (
+                <div className="mt-3 border-t pt-3">
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">AI Assistant</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      disabled={isAiPending}
+                      onClick={() => runAi(paper, "summarize")}
+                      className="rounded-lg border bg-background px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-50"
+                    >
+                      Summarize
+                    </button>
+                    <button
+                      disabled={isAiPending}
+                      onClick={() => runAi(paper, "suggest-rejection")}
+                      className="rounded-lg border bg-background px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-50"
+                    >
+                      Draft rejection
+                    </button>
+                    <button
+                      disabled={isAiPending}
+                      onClick={() => runAi(paper, "suggest-tags")}
+                      className="rounded-lg border bg-background px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-50"
+                    >
+                      Suggest tags
+                    </button>
+                  </div>
+
+                  {/* Result card — shows below the paper whose AI was triggered */}
+                  {aiResult?.paperId === paper.id && (
+                    <div className="mt-3 rounded-xl border bg-muted/30 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold capitalize text-muted-foreground">
+                          {aiResult.type.replace(/-/g, " ")}
+                        </p>
+                        <button
+                          onClick={() => setAiResult(null)}
+                          className="text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <pre className="mt-2 whitespace-pre-wrap text-xs leading-5">{aiResult.text}</pre>
+                      {aiResult.type === "suggest-rejection" && (
+                        <button
+                          className="mt-2 rounded-lg border bg-background px-2.5 py-1 text-xs hover:bg-muted"
+                          onClick={() => {
+                            const reason = aiResult.text
+                            if (confirm(`Use this as rejection reason?\n\n"${reason}"`)) {
+                              clientAction(`/research/${paper.id}/reject`, "PATCH", { reason })
+                                .then(() => { setAiResult(null); load(activeStatus) })
+                                .catch(() => {})
+                            }
+                          }}
+                        >
+                          Use as rejection reason
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             {paper.status === "pending" && (
               <div className="flex shrink-0 gap-2">
