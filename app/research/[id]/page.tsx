@@ -1,0 +1,116 @@
+import Link from "next/link"
+import { ArrowLeft, Download, Eye, FileText, Quote } from "lucide-react"
+import { notFound } from "next/navigation"
+
+import { Button } from "@/components/ui/button"
+import { PublicShell } from "@/components/layout/public-shell"
+import { getResearch } from "@/lib/api"
+import { ResearchActions } from "@/components/features/research-actions"
+
+type PageProps = {
+  params: Promise<{ id: string }>
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Undated"
+  return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(value))
+}
+
+export default async function ResearchDetailPage({ params }: PageProps) {
+  const { id } = await params
+  let research
+
+  try {
+    research = await getResearch(id)
+  } catch {
+    notFound()
+  }
+
+  const authorLine = research.authors?.map((author) => author.name).join(", ") || "Unknown authors"
+  const isPrivate = research.filePrivacy === "private"
+  const citation = `${authorLine}. (${research.publishDate?.slice(0, 4) ?? "n.d."}). ${research.title}.`
+
+  return (
+    <PublicShell>
+      <article className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+        <Button variant="ghost" asChild>
+          <Link href="/search">
+            <ArrowLeft className="size-4" /> Back to results
+          </Link>
+        </Button>
+
+        <div className="mt-8 rounded-3xl border bg-card p-6 sm:p-8">
+          <div className="flex flex-wrap gap-2">
+            {research.categories?.map((category) => (
+              <Link key={category.id} href={`/categories/${category.id}`} className="rounded-full bg-secondary px-3 py-1 text-xs font-medium">
+                {category.name}
+              </Link>
+            ))}
+          </div>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight sm:text-5xl">{research.title}</h1>
+          <p className="mt-4 text-muted-foreground">Authors: {authorLine}</p>
+          <p className="mt-1 text-sm text-muted-foreground">Published: {formatDate(research.publishDate)}</p>
+
+          <div className="mt-6 flex flex-wrap gap-2">
+            {research.keywords?.map((keyword) => (
+              <span key={keyword.id} className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
+                {keyword.name}
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-8 grid gap-3 rounded-2xl bg-muted/50 p-4 text-sm sm:grid-cols-3">
+            <div className="flex items-center gap-2">
+              <Eye className="size-4" /> Views: {research.viewCount ?? 0}
+            </div>
+            <div className="flex items-center gap-2">
+              <Download className="size-4" /> Downloads: {research.downloadCount ?? 0}
+            </div>
+            <div className="flex items-center gap-2">
+              <Quote className="size-4" /> Citations: {research.citationCount ?? 0}
+            </div>
+          </div>
+
+          <ResearchActions researchId={research.id} isPrivate={isPrivate} citation={citation} />
+        </div>
+
+        <section className="mt-8 rounded-3xl border bg-card p-6 sm:p-8">
+          <h2 className="text-xl font-semibold">Abstract</h2>
+          <p className="mt-4 leading-8 text-muted-foreground">{research.abstract ?? "No abstract provided."}</p>
+        </section>
+
+        <section className="mt-8 rounded-3xl border bg-card p-6 sm:p-8">
+          <h2 className="text-xl font-semibold">PDF Viewer</h2>
+          {isPrivate ? (
+            <div className="mt-4 rounded-2xl border border-dashed p-8 text-center text-muted-foreground">
+              This PDF is private. Submit a PDF request to contact the owner.
+            </div>
+          ) : (
+            <div className="mt-4 flex min-h-72 items-center justify-center rounded-2xl border border-dashed bg-muted/30 text-muted-foreground">
+              <div className="text-center">
+                <FileText className="mx-auto mb-3 size-8" />
+                Use Download PDF above to request a presigned viewer URL.
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="mt-8 rounded-3xl border bg-card p-6 sm:p-8">
+          <h2 className="text-xl font-semibold">Citation Generator</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-[180px_1fr_auto]">
+            <select className="h-10 rounded-lg border bg-background px-3">
+              <option>APA</option>
+              <option>MLA</option>
+              <option>Chicago</option>
+              <option>IEEE</option>
+            </select>
+            <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              {citation}
+            </div>
+            <Button variant="outline">Copy from Cite</Button>
+          </div>
+        </section>
+      </article>
+    </PublicShell>
+  )
+}

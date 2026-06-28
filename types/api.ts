@@ -1,0 +1,134 @@
+export type ApiEnvelope<T> = {
+  data: T
+}
+
+export type PaginatedResponse<T> = {
+  data: T[]
+  meta: {
+    total: number
+    page: number
+    totalPages: number
+  }
+}
+
+export type ResearchSummary = {
+  id: string
+  title: string
+  abstract?: string | null
+  publishDate?: string | null
+  status?: "pending" | "approved" | "rejected"
+  filePrivacy?: "public" | "private"
+  viewCount?: number
+  downloadCount?: number
+  citationCount?: number
+  createdAt?: string
+  rank?: number
+  authors?: Author[]
+  categories?: Category[]
+}
+
+export type ResearchDetail = ResearchSummary & {
+  fileKey?: string | null
+  fileName?: string | null
+  uploadComplete?: boolean
+  uploaderId?: string
+  rejectionReason?: string | null
+  updatedAt?: string
+  uploader?: {
+    id: string
+    email: string
+    firstName: string
+    lastName: string
+    role: "admin" | "user" | "guest"
+  }
+  keywords?: Keyword[]
+}
+
+export type Author = {
+  id: string
+  name: string
+  email?: string | null
+  paperCount?: number
+}
+
+export type Category = {
+  id: string
+  name: string
+  researchCount?: number
+}
+
+export type Keyword = {
+  id: string
+  name: string
+}
+
+export type SearchSuggestions = {
+  researches: Array<{ id: string; title: string; similarity: number }>
+  authors: Array<{ id: string; name: string }>
+}
+
+export type LoginResponse = {
+  accessToken: string
+  refreshToken: string
+  user: {
+    id: string
+    email: string
+    role: "admin" | "user" | "guest"
+  }
+}
+
+export type UserProfile = {
+  id: string
+  email: string
+  firstName: string
+  middleName?: string | null
+  lastName: string
+  suffix?: string | null
+  role: "admin" | "user" | "guest"
+  status: string
+  institution?: { id: string; name: string } | null
+  program?: { id: string; name: string } | null
+  createdAt?: string
+}
+
+export type AnalyticsOverview = {
+  totalResearches: number
+  totalUsers?: number
+  totalViews: number
+  totalDownloads: number
+  totalCitations: number
+}
+
+export type AnalyticsPoint = {
+  date: string
+  count: number
+}
+
+export type NotificationItem = {
+  id: string
+  message: string
+  read: boolean
+  createdAt: string
+  research?: { id: string; title: string } | null
+}
+
+export type CollectionItem = {
+  researchId: string
+  createdAt: string
+  research: ResearchSummary & {
+    researchAuthors?: Array<{ author: Author }>
+    researchCategories?: Array<{ category: Category }>
+  }
+}
+
+export type PdfRequestItem = {
+  request: {
+    id: string
+    requesterName: string
+    requesterEmail: string
+    purpose?: string | null
+    status: string
+    createdAt: string
+  }
+  research: { id: string; title: string }
+}
