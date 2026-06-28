@@ -519,45 +519,145 @@ export function AdminUsersPanel() {
   )
 }
 
-export function AdminResearchPanel() {
+export function AdminResearchPanel({ statusFilter = "" }: { statusFilter?: string }) {
   const [papers, setPapers] = useState<ResearchSummary[]>([])
+  const [total, setTotal] = useState(0)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [activeStatus, setActiveStatus] = useState(statusFilter)
 
-  function load() {
-    clientPaginated<ResearchSummary>("/research/pending")
-      .then((response) => setPapers(response.data))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Unable to load pending research"))
+  function load(status: string) {
+    const query = status ? `?status=${status}&limit=50` : "?limit=50"
+    clientPaginated<ResearchSummary>(`/research/admin/all${query}`, 1, 50)
+      .then((response) => {
+        setPapers(response.data)
+        setTotal(response.meta.total)
+      })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Unable to load research"))
   }
 
-  useEffect(load, [])
+  useEffect(() => { load(activeStatus) }, [activeStatus])
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    const pending = papers.filter((p) => p.status === "pending")
+    if (selected.size === pending.length && pending.length > 0) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(pending.map((p) => p.id)))
+    }
+  }
+
+  function bulkApprove() {
+    if (!selected.size) return
+    if (!window.confirm(`Approve ${selected.size} paper(s)?`)) return
+    startTransition(async () => {
+      await Promise.allSettled(
+        [...selected].map((id) => clientAction(`/research/${id}/approve`, "PATCH"))
+      )
+      setSelected(new Set())
+      load(activeStatus)
+    })
+  }
 
   function decide(id: string, action: "approve" | "reject") {
     if (action === "reject") {
       const reason = window.prompt("Rejection reason:")
       if (!reason?.trim()) return
-      startTransition(async () => { await clientAction(`/research/${id}/reject`, "PATCH", { reason }); load() })
+      startTransition(async () => { await clientAction(`/research/${id}/reject`, "PATCH", { reason }); load(activeStatus) })
     } else {
-      startTransition(async () => { await clientAction(`/research/${id}/approve`, "PATCH"); load() })
+      startTransition(async () => { await clientAction(`/research/${id}/approve`, "PATCH"); load(activeStatus) })
     }
   }
 
+  const statusTabs = [
+    { label: "All", value: "" },
+    { label: "Pending", value: "pending" },
+    { label: "Approved", value: "approved" },
+    { label: "Rejected", value: "rejected" },
+  ]
+
+  const pendingCount = papers.filter((p) => p.status === "pending").length
+
   return (
     <section className="rounded-3xl border bg-card p-8">
-      <h1 className="text-3xl font-semibold tracking-tight">Manage Research</h1>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Manage Research</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{total} total papers</p>
+        </div>
+        {selected.size > 0 && (
+          <Button disabled={isPending} onClick={bulkApprove}>
+            Approve {selected.size} selected
+          </Button>
+        )}
+      </div>
+
+      {/* Status tabs */}
+      <div className="mt-6 flex gap-1 rounded-xl border bg-muted/30 p-1 w-fit">
+        {statusTabs.map(({ label, value }) => (
+          <button
+            key={value}
+            onClick={() => { setActiveStatus(value); setSelected(new Set()) }}
+            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+              activeStatus === value
+                ? "bg-card shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="mt-6"><AuthNotice error={error} /></div>
-      <div className="mt-6 grid gap-3">
+
+      {/* Select-all row for pending */}
+      {(activeStatus === "" || activeStatus === "pending") && pendingCount > 0 && (
+        <div className="mt-4 flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={selected.size === pendingCount} onChange={toggleAll} className="accent-primary" />
+          <span className="text-muted-foreground">Select all pending ({pendingCount})</span>
+        </div>
+      )}
+
+      <div className="mt-4 grid gap-3">
         {papers.map((paper) => (
-          <div key={paper.id} className="rounded-xl border p-4">
-            <h2 className="font-medium">{paper.title}</h2>
-            <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{paper.abstract}</p>
-            <div className="mt-4 flex gap-2">
-              <Button disabled={isPending} onClick={() => decide(paper.id, "approve")}>Approve</Button>
-              <Button variant="outline" disabled={isPending} onClick={() => decide(paper.id, "reject")}>Reject</Button>
+          <div key={paper.id} className="flex items-start gap-3 rounded-xl border bg-background p-4">
+            {paper.status === "pending" && (
+              <input
+                type="checkbox"
+                checked={selected.has(paper.id)}
+                onChange={() => toggleSelect(paper.id)}
+                className="mt-1 accent-primary"
+              />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h2 className="font-medium">{paper.title}</h2>
+                <span className={`rounded border px-1.5 py-0.5 text-[11px] font-medium capitalize ${STATUS_STYLES[paper.status ?? "pending"] ?? ""}`}>
+                  {paper.status}
+                </span>
+              </div>
+              <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{paper.abstract}</p>
             </div>
+            {paper.status === "pending" && (
+              <div className="flex shrink-0 gap-2">
+                <Button size="sm" disabled={isPending} onClick={() => decide(paper.id, "approve")}>Approve</Button>
+                <Button size="sm" variant="outline" disabled={isPending} onClick={() => decide(paper.id, "reject")}>Reject</Button>
+              </div>
+            )}
           </div>
         ))}
-        {!papers.length && !error && <p className="text-sm text-muted-foreground">No pending research.</p>}
+        {!papers.length && !error && <p className="text-sm text-muted-foreground">No papers found.</p>}
       </div>
     </section>
   )
