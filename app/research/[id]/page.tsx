@@ -66,6 +66,12 @@ export default async function ResearchDetailPage({ params }: PageProps) {
           <p className="mt-4 text-muted-foreground">Authors: {authorLine}</p>
           <p className="mt-1 text-sm text-muted-foreground">Published: {formatDate(research.publishDate)}</p>
 
+          {research.rejectionReason && (
+            <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+              <span className="font-medium">Rejected:</span> {research.rejectionReason}
+            </div>
+          )}
+
           <div className="mt-6 flex flex-wrap gap-2">
             {research.keywords?.map((keyword) => (
               <span key={keyword.id} className="rounded-full border px-3 py-1 text-xs text-muted-foreground">

@@ -23,6 +23,7 @@ export type ResearchSummary = {
   citationCount?: number
   createdAt?: string
   rank?: number
+  rejectionReason?: string | null
   authors?: Author[]
   categories?: Category[]
 }

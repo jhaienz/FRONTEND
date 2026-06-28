@@ -157,6 +157,11 @@ export function MyPapersPanel() {
                   <span className="capitalize">{paper.filePrivacy ?? "public"}</span>
                   <span>{paper.viewCount ?? 0} views</span>
                 </div>
+                {paper.status === "rejected" && paper.rejectionReason && (
+                  <p className="mt-2 rounded-lg bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                    Rejection reason: {paper.rejectionReason}
+                  </p>
+                )}
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {(paper.status === "pending" || paper.status === "rejected") && (
@@ -164,6 +169,22 @@ export function MyPapersPanel() {
                     <Button variant="outline" size="sm" asChild>
                       <Link href={`/dashboard/papers/${paper.id}/edit`}>Edit</Link>
                     </Button>
+                    {paper.status === "rejected" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isPending}
+                        onClick={() => {
+                          if (!window.confirm("Resubmit this paper for review?")) return
+                          startTransition(async () => {
+                            await clientAction(`/research/${paper.id}/resubmit`, "PATCH")
+                            load()
+                          })
+                        }}
+                      >
+                        Resubmit
+                      </Button>
+                    )}
                     <Button variant="outline" size="sm" disabled={isPending} onClick={() => remove(paper.id)}
                       className="text-destructive hover:text-destructive">
                       Delete
