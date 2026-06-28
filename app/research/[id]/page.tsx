@@ -109,11 +109,14 @@ export default async function ResearchDetailPage({ params }: PageProps) {
             <div className="flex items-center gap-2">
               <Quote className="size-4" /> Citations: {research.citationCount ?? 0}
             </div>
-            {estimateReadTime(research.abstract) && (
-              <div className="flex items-center gap-2">
-                ~{estimateReadTime(research.abstract)} min read
-              </div>
-            )}
+            {(() => {
+              const mins = estimateReadTime(research.abstract)
+              return mins ? (
+                <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                  ~{mins} min read
+                </span>
+              ) : null
+            })()}
           </div>
 
           <ResearchActions researchId={research.id} isPrivate={isPrivate} citation={`${authorLine}. (${citationYear}). ${research.title}.`} />
