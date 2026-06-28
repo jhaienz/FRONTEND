@@ -20,7 +20,7 @@ import type {
 function AuthNotice({ error }: { error: string | null }) {
   if (!error) return null
   return (
-    <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+    <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
       {error} <Link href="/login" className="font-medium underline">Sign in</Link>
     </div>
   )
@@ -34,11 +34,10 @@ function StatGrid({ overview }: { overview: AnalyticsOverview | null }) {
     ["Citations", overview?.totalCitations],
     ...(overview?.totalUsers === undefined ? [] : [["Users", overview.totalUsers] as [string, number]]),
   ]
-
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
       {stats.map(([label, value]) => (
-        <div key={label} className="rounded-2xl border bg-background p-5">
+        <div key={label} className="rounded-xl border bg-background p-5">
           <p className="text-sm text-muted-foreground">{label}</p>
           <p className="mt-2 text-3xl font-semibold">{value ?? "--"}</p>
         </div>
@@ -47,9 +46,12 @@ function StatGrid({ overview }: { overview: AnalyticsOverview | null }) {
   )
 }
 
+type UploadsByRole = { role: string; uploads: number }
+
 export function AnalyticsPanel({ admin = false }: { admin?: boolean }) {
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
   const [trend, setTrend] = useState<AnalyticsPoint[]>([])
+  const [uploadsByRole, setUploadsByRole] = useState<UploadsByRole[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -63,6 +65,12 @@ export function AnalyticsPanel({ admin = false }: { admin?: boolean }) {
         setTrend(nextTrend)
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "Unable to load analytics"))
+
+    if (admin) {
+      clientEnvelope<UploadsByRole[]>("/analytics/admin/uploads-by-role")
+        .then(setUploadsByRole)
+        .catch(() => {})
+    }
   }, [admin])
 
   return (
@@ -71,42 +79,114 @@ export function AnalyticsPanel({ admin = false }: { admin?: boolean }) {
       <p className="mt-3 text-muted-foreground">Live analytics from the backend.</p>
       <div className="mt-8"><AuthNotice error={error} /></div>
       <div className="mt-6"><StatGrid overview={overview} /></div>
-      <div className="mt-8 rounded-2xl border bg-background p-5">
+      <div className="mt-8 rounded-xl border bg-background p-5">
         <h2 className="font-semibold">Weekly views</h2>
         <div className="mt-4 grid gap-2">
           {trend.map((point) => (
-            <div key={point.date} className="flex items-center justify-between rounded-xl bg-muted/50 px-3 py-2 text-sm">
+            <div key={point.date} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm">
               <span>{new Date(point.date).toLocaleDateString()}</span>
               <span className="font-medium">{point.count}</span>
             </div>
           ))}
-          {!trend.length ? <p className="text-sm text-muted-foreground">No trend data yet.</p> : null}
+          {!trend.length && <p className="text-sm text-muted-foreground">No trend data yet.</p>}
         </div>
       </div>
+      {admin && uploadsByRole.length > 0 && (
+        <div className="mt-6 rounded-xl border bg-background p-5">
+          <h2 className="font-semibold">Uploads by role</h2>
+          <div className="mt-4 grid gap-2">
+            {uploadsByRole.map((row) => (
+              <div key={row.role} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm">
+                <span className="capitalize">{row.role}</span>
+                <span className="font-medium">{row.uploads} uploads</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   )
+}
+
+const STATUS_STYLES: Record<string, string> = {
+  pending: "bg-amber-50 text-amber-700 border-amber-200",
+  approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  rejected: "bg-red-50 text-red-700 border-red-200",
 }
 
 export function MyPapersPanel() {
   const [papers, setPapers] = useState<ResearchSummary[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
 
-  useEffect(() => {
+  function load() {
     clientPaginated<ResearchSummary>("/research/my")
       .then((response) => setPapers(response.data))
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "Unable to load papers"))
-  }, [])
+  }
+
+  useEffect(load, [])
+
+  function remove(id: string) {
+    if (!window.confirm("Delete this paper? This cannot be undone.")) return
+    startTransition(async () => {
+      await clientAction(`/research/${id}`, "DELETE")
+      load()
+    })
+  }
 
   return (
     <section className="rounded-3xl border bg-card p-8">
-      <h1 className="text-3xl font-semibold tracking-tight">My Papers</h1>
-      <div className="mt-6"><AuthNotice error={error} /></div>
-      <div className="mt-6 overflow-hidden rounded-2xl border">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-muted/50"><tr><th className="p-3">Title</th><th className="p-3">Status</th><th className="p-3">Privacy</th><th className="p-3">Views</th></tr></thead>
-          <tbody>{papers.map((paper) => <tr key={paper.id} className="border-t"><td className="p-3 font-medium"><Link href={`/research/${paper.id}`}>{paper.title}</Link></td><td className="p-3">{paper.status}</td><td className="p-3">{paper.filePrivacy}</td><td className="p-3">{paper.viewCount ?? 0}</td></tr>)}</tbody>
-        </table>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-3xl font-semibold tracking-tight">My Papers</h1>
+        <Button asChild><Link href="/upload">Submit new</Link></Button>
       </div>
+      <div className="mt-6"><AuthNotice error={error} /></div>
+      {papers.length ? (
+        <div className="mt-6 grid gap-3">
+          {papers.map((paper) => (
+            <div key={paper.id} className="flex items-start justify-between gap-4 rounded-xl border bg-background p-4">
+              <div className="min-w-0 flex-1">
+                <Link href={`/research/${paper.id}`} className="font-medium hover:text-primary line-clamp-1 transition-colors">
+                  {paper.title}
+                </Link>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className={`rounded border px-1.5 py-0.5 font-medium capitalize ${STATUS_STYLES[paper.status ?? "pending"] ?? ""}`}>
+                    {paper.status ?? "pending"}
+                  </span>
+                  <span className="capitalize">{paper.filePrivacy ?? "public"}</span>
+                  <span>{paper.viewCount ?? 0} views</span>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {(paper.status === "pending" || paper.status === "rejected") && (
+                  <>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/dashboard/papers/${paper.id}/edit`}>Edit</Link>
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={isPending} onClick={() => remove(paper.id)}
+                      className="text-destructive hover:text-destructive">
+                      Delete
+                    </Button>
+                  </>
+                )}
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href={`/research/${paper.id}`}>View</Link>
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        !error && (
+          <div className="mt-6 rounded-xl border border-dashed p-10 text-center">
+            <p className="text-sm text-muted-foreground">No papers yet. Submit your first research.</p>
+            <Button variant="outline" className="mt-4" asChild>
+              <Link href="/upload">Submit a paper</Link>
+            </Button>
+          </div>
+        )
+      )}
     </section>
   )
 }
@@ -136,7 +216,13 @@ export function CollectionsPanel() {
       <h1 className="text-3xl font-semibold tracking-tight">My Collections</h1>
       <div className="mt-6"><AuthNotice error={error} /></div>
       <div className="mt-6 grid gap-3">
-        {items.map((item) => <div key={item.researchId} className="flex items-center justify-between gap-4 rounded-2xl border p-4"><Link href={`/research/${item.researchId}`} className="font-medium hover:text-primary">{item.research.title}</Link><Button variant="outline" disabled={isPending} onClick={() => remove(item.researchId)}>Remove</Button></div>)}
+        {items.map((item) => (
+          <div key={item.researchId} className="flex items-center justify-between gap-4 rounded-xl border p-4">
+            <Link href={`/research/${item.researchId}`} className="font-medium hover:text-primary">{item.research.title}</Link>
+            <Button variant="outline" disabled={isPending} onClick={() => remove(item.researchId)}>Remove</Button>
+          </div>
+        ))}
+        {!items.length && !error && <p className="text-sm text-muted-foreground">No saved papers yet.</p>}
       </div>
     </section>
   )
@@ -157,9 +243,22 @@ export function NotificationsPanel() {
 
   return (
     <section className="rounded-3xl border bg-card p-8">
-      <div className="flex items-center justify-between gap-4"><h1 className="text-3xl font-semibold tracking-tight">Notifications</h1><Button disabled={isPending} onClick={() => startTransition(async () => { await clientAction("/notifications/read-all", "PATCH"); load() })}>Mark all read</Button></div>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-3xl font-semibold tracking-tight">Notifications</h1>
+        <Button disabled={isPending} onClick={() => startTransition(async () => { await clientAction("/notifications/read-all", "PATCH"); load() })}>
+          Mark all read
+        </Button>
+      </div>
       <div className="mt-6"><AuthNotice error={error} /></div>
-      <div className="mt-6 grid gap-3">{items.map((item) => <div key={item.id} className="rounded-2xl border p-4"><p className={item.read ? "text-muted-foreground" : "font-medium"}>{item.message}</p><p className="mt-1 text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString()}</p></div>)}</div>
+      <div className="mt-6 grid gap-3">
+        {items.map((item) => (
+          <div key={item.id} className="rounded-xl border p-4">
+            <p className={item.read ? "text-muted-foreground" : "font-medium"}>{item.message}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString()}</p>
+          </div>
+        ))}
+        {!items.length && !error && <p className="text-sm text-muted-foreground">No notifications yet.</p>}
+      </div>
     </section>
   )
 }
@@ -188,16 +287,35 @@ export function PdfRequestsPanel() {
     <section className="rounded-3xl border bg-card p-8">
       <h1 className="text-3xl font-semibold tracking-tight">PDF Requests</h1>
       <div className="mt-6"><AuthNotice error={error} /></div>
-      <div className="mt-6 grid gap-3">{items.map(({ request, research }) => <div key={request.id} className="rounded-2xl border p-4"><h2 className="font-medium">{research.title}</h2><p className="mt-1 text-sm text-muted-foreground">{request.requesterName} · {request.requesterEmail}</p><p className="mt-2 text-sm">{request.purpose}</p><div className="mt-4 flex gap-2"><Button disabled={isPending} onClick={() => decide(request.id, "approve")}>Approve</Button><Button variant="outline" disabled={isPending} onClick={() => decide(request.id, "reject")}>Reject</Button></div></div>)}</div>
+      <div className="mt-6 grid gap-3">
+        {items.map(({ request, research }) => (
+          <div key={request.id} className="rounded-xl border p-4">
+            <h2 className="font-medium">{research.title}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{request.requesterName} · {request.requesterEmail}</p>
+            <p className="mt-2 text-sm">{request.purpose}</p>
+            <p className="mt-1 text-xs capitalize text-muted-foreground">Status: {request.status}</p>
+            {request.status === "pending" && (
+              <div className="mt-4 flex gap-2">
+                <Button disabled={isPending} onClick={() => decide(request.id, "approve")}>Approve</Button>
+                <Button variant="outline" disabled={isPending} onClick={() => decide(request.id, "reject")}>Reject</Button>
+              </div>
+            )}
+          </div>
+        ))}
+        {!items.length && !error && <p className="text-sm text-muted-foreground">No PDF requests yet.</p>}
+      </div>
     </section>
   )
 }
 
 export function SettingsPanel() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
+  const [profileMessage, setProfileMessage] = useState<string | null>(null)
+  const [picMessage, setPicMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [picError, setPicError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [isPicPending, startPicTransition] = useTransition()
 
   useEffect(() => {
     clientEnvelope<UserProfile>("/users/me")
@@ -216,7 +334,29 @@ export function SettingsPanel() {
         suffix: form.get("suffix") || null,
       })
       setProfile(updated)
-      setMessage("Profile updated")
+      setProfileMessage("Profile updated")
+    })
+  }
+
+  function onPicUpload(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const file = (new FormData(event.currentTarget).get("picture")) as File | null
+    setPicError(null)
+    setPicMessage(null)
+
+    if (!file || file.size === 0) { setPicError("Select an image file."); return }
+    if (!file.type.startsWith("image/")) { setPicError("Only image files are accepted."); return }
+    if (file.size > 5 * 1024 * 1024) { setPicError("Image must be under 5 MB."); return }
+
+    startPicTransition(async () => {
+      try {
+        const { uploadUrl } = await clientAction<{ uploadUrl: string; key: string }>("/users/me/profile-picture", "POST")
+        const r2 = await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } })
+        if (!r2.ok) throw new Error("Upload to storage failed")
+        setPicMessage("Profile picture updated.")
+      } catch (err) {
+        setPicError(err instanceof Error ? err.message : "Upload failed")
+      }
     })
   }
 
@@ -224,7 +364,42 @@ export function SettingsPanel() {
     <section className="rounded-3xl border bg-card p-8">
       <h1 className="text-3xl font-semibold tracking-tight">Account Settings</h1>
       <div className="mt-6"><AuthNotice error={error} /></div>
-      {profile ? <form onSubmit={onSubmit} className="mt-6 grid max-w-2xl gap-4"><label className="grid gap-2 text-sm">First Name<input name="firstName" defaultValue={profile.firstName} className="h-10 rounded-lg border bg-background px-3" /></label><label className="grid gap-2 text-sm">Middle Name<input name="middleName" defaultValue={profile.middleName ?? ""} className="h-10 rounded-lg border bg-background px-3" /></label><label className="grid gap-2 text-sm">Last Name<input name="lastName" defaultValue={profile.lastName} className="h-10 rounded-lg border bg-background px-3" /></label><label className="grid gap-2 text-sm">Suffix<input name="suffix" defaultValue={profile.suffix ?? ""} className="h-10 rounded-lg border bg-background px-3" /></label>{message ? <p className="text-sm text-muted-foreground">{message}</p> : null}<Button disabled={isPending}>Save changes</Button></form> : null}
+
+      {/* Profile picture */}
+      <div className="mt-8 border-t pt-8">
+        <h2 className="font-semibold">Profile Picture</h2>
+        <form onSubmit={onPicUpload} className="mt-4 flex flex-wrap items-end gap-4">
+          <label className="grid gap-2 text-sm font-medium">
+            Image file
+            <input name="picture" type="file" accept="image/*" className="rounded-lg border bg-background p-2 text-sm" />
+          </label>
+          <Button type="submit" variant="outline" disabled={isPicPending}>
+            {isPicPending ? "Uploading…" : "Upload"}
+          </Button>
+        </form>
+        {picMessage && <p className="mt-2 text-sm text-muted-foreground">{picMessage}</p>}
+        {picError && <p className="mt-2 text-sm text-destructive">{picError}</p>}
+      </div>
+
+      {/* Profile fields */}
+      {profile && (
+        <form onSubmit={onSubmit} className="mt-8 grid max-w-2xl gap-4 border-t pt-8">
+          <h2 className="font-semibold">Personal Info</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-2 text-sm">First Name<input name="firstName" defaultValue={profile.firstName} className="h-10 rounded-lg border bg-background px-3" /></label>
+            <label className="grid gap-2 text-sm">Last Name<input name="lastName" defaultValue={profile.lastName} className="h-10 rounded-lg border bg-background px-3" /></label>
+            <label className="grid gap-2 text-sm">Middle Name<input name="middleName" defaultValue={profile.middleName ?? ""} className="h-10 rounded-lg border bg-background px-3" /></label>
+            <label className="grid gap-2 text-sm">Suffix<input name="suffix" defaultValue={profile.suffix ?? ""} className="h-10 rounded-lg border bg-background px-3" /></label>
+          </div>
+          <div className="grid gap-1 text-sm text-muted-foreground">
+            <span>Email: {profile.email}</span>
+            {profile.institution && <span>Institution: {profile.institution.name}</span>}
+            {profile.program && <span>Program: {profile.program.name}</span>}
+          </div>
+          {profileMessage && <p className="text-sm text-muted-foreground">{profileMessage}</p>}
+          <Button disabled={isPending} className="w-fit">Save changes</Button>
+        </form>
+      )}
     </section>
   )
 }
@@ -232,16 +407,110 @@ export function SettingsPanel() {
 export function AdminUsersPanel() {
   const [users, setUsers] = useState<UserProfile[]>([])
   const [error, setError] = useState<string | null>(null)
-  useEffect(() => { clientPaginated<UserProfile>("/users").then((response) => setUsers(response.data)).catch((err: unknown) => setError(err instanceof Error ? err.message : "Unable to load users")) }, [])
-  return <section className="rounded-3xl border bg-card p-8"><h1 className="text-3xl font-semibold tracking-tight">Manage Users</h1><div className="mt-6"><AuthNotice error={error} /></div><div className="mt-6 overflow-hidden rounded-2xl border"><table className="w-full text-left text-sm"><thead className="bg-muted/50"><tr><th className="p-3">Name</th><th className="p-3">Email</th><th className="p-3">Role</th><th className="p-3">Status</th></tr></thead><tbody>{users.map((user) => <tr key={user.id} className="border-t"><td className="p-3">{user.firstName} {user.lastName}</td><td className="p-3">{user.email}</td><td className="p-3">{user.role}</td><td className="p-3">{user.status}</td></tr>)}</tbody></table></div></section>
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  function load() {
+    clientPaginated<UserProfile>("/users")
+      .then((response) => setUsers(response.data))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Unable to load users"))
+  }
+
+  useEffect(load, [])
+
+  function remove(id: string) {
+    if (!window.confirm("Delete this user? This cannot be undone.")) return
+    startTransition(async () => {
+      await clientAction(`/users/${id}`, "DELETE")
+      load()
+    })
+  }
+
+  function saveEdit(event: React.FormEvent<HTMLFormElement>, id: string) {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    startTransition(async () => {
+      await clientAction(`/users/${id}`, "PATCH", {
+        role: form.get("role"),
+        status: form.get("status"),
+      })
+      setEditingId(null)
+      load()
+    })
+  }
+
+  return (
+    <section className="rounded-3xl border bg-card p-8">
+      <h1 className="text-3xl font-semibold tracking-tight">Manage Users</h1>
+      <div className="mt-6"><AuthNotice error={error} /></div>
+      <div className="mt-6 grid gap-3">
+        {users.map((user) => (
+          <div key={user.id} className="rounded-xl border bg-background p-4">
+            {editingId === user.id ? (
+              <form onSubmit={(e) => saveEdit(e, user.id)} className="grid gap-3">
+                <p className="font-medium">{user.firstName} {user.lastName} <span className="text-sm font-normal text-muted-foreground">· {user.email}</span></p>
+                <div className="flex flex-wrap gap-3">
+                  <label className="grid gap-1 text-xs">
+                    Role
+                    <select name="role" defaultValue={user.role} className="h-8 rounded border bg-background px-2 text-sm">
+                      <option value="guest">guest</option>
+                      <option value="user">user</option>
+                      <option value="admin">admin</option>
+                    </select>
+                  </label>
+                  <label className="grid gap-1 text-xs">
+                    Status
+                    <select name="status" defaultValue={user.status} className="h-8 rounded border bg-background px-2 text-sm">
+                      <option value="unverified">unverified</option>
+                      <option value="active">active</option>
+                      <option value="suspended">suspended</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit" size="sm" disabled={isPending}>Save</Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="font-medium">{user.firstName} {user.lastName}</p>
+                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                  <div className="mt-1 flex gap-2 text-xs text-muted-foreground">
+                    <span className="capitalize">{user.role}</span>
+                    <span>·</span>
+                    <span className="capitalize">{user.status}</span>
+                  </div>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setEditingId(user.id)}>Edit</Button>
+                  <Button variant="outline" size="sm" disabled={isPending} onClick={() => remove(user.id)}
+                    className="text-destructive hover:text-destructive">Delete</Button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {!users.length && !error && <p className="text-sm text-muted-foreground">No users found.</p>}
+      </div>
+    </section>
+  )
 }
 
 export function AdminResearchPanel() {
   const [papers, setPapers] = useState<ResearchSummary[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  function load() { clientPaginated<ResearchSummary>("/research/pending").then((response) => setPapers(response.data)).catch((err: unknown) => setError(err instanceof Error ? err.message : "Unable to load pending research")) }
+
+  function load() {
+    clientPaginated<ResearchSummary>("/research/pending")
+      .then((response) => setPapers(response.data))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Unable to load pending research"))
+  }
+
   useEffect(load, [])
+
   function decide(id: string, action: "approve" | "reject") {
     if (action === "reject") {
       const reason = window.prompt("Rejection reason:")
@@ -251,16 +520,99 @@ export function AdminResearchPanel() {
       startTransition(async () => { await clientAction(`/research/${id}/approve`, "PATCH"); load() })
     }
   }
-  return <section className="rounded-3xl border bg-card p-8"><h1 className="text-3xl font-semibold tracking-tight">Manage Research</h1><div className="mt-6"><AuthNotice error={error} /></div><div className="mt-6 grid gap-3">{papers.map((paper) => <div key={paper.id} className="rounded-2xl border p-4"><h2 className="font-medium">{paper.title}</h2><p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{paper.abstract}</p><div className="mt-4 flex gap-2"><Button disabled={isPending} onClick={() => decide(paper.id, "approve")}>Approve</Button><Button variant="outline" disabled={isPending} onClick={() => decide(paper.id, "reject")}>Reject</Button></div></div>)}</div></section>
+
+  return (
+    <section className="rounded-3xl border bg-card p-8">
+      <h1 className="text-3xl font-semibold tracking-tight">Manage Research</h1>
+      <div className="mt-6"><AuthNotice error={error} /></div>
+      <div className="mt-6 grid gap-3">
+        {papers.map((paper) => (
+          <div key={paper.id} className="rounded-xl border p-4">
+            <h2 className="font-medium">{paper.title}</h2>
+            <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{paper.abstract}</p>
+            <div className="mt-4 flex gap-2">
+              <Button disabled={isPending} onClick={() => decide(paper.id, "approve")}>Approve</Button>
+              <Button variant="outline" disabled={isPending} onClick={() => decide(paper.id, "reject")}>Reject</Button>
+            </div>
+          </div>
+        ))}
+        {!papers.length && !error && <p className="text-sm text-muted-foreground">No pending research.</p>}
+      </div>
+    </section>
+  )
 }
 
 export function TaxonomyManager({ title, endpoint }: { title: string; endpoint: string }) {
   const [items, setItems] = useState<Array<Category | Keyword>>([])
   const [error, setError] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState("")
   const [isPending, startTransition] = useTransition()
-  function load() { clientEnvelope<Array<Category | Keyword>>(endpoint).then(setItems).catch((err: unknown) => setError(err instanceof Error ? err.message : `Unable to load ${title}`)) }
+
+  function load() {
+    clientEnvelope<Array<Category | Keyword>>(endpoint)
+      .then(setItems)
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : `Unable to load ${title}`))
+  }
+
   useEffect(load, [endpoint, title])
-  function create(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const name = new FormData(event.currentTarget).get("name"); startTransition(async () => { await clientAction(endpoint, "POST", { name }); event.currentTarget.reset(); load() }) }
-  function remove(id: string) { startTransition(async () => { await clientAction(`${endpoint}/${id}`, "DELETE"); load() }) }
-  return <section className="rounded-3xl border bg-card p-8"><h1 className="text-3xl font-semibold tracking-tight">{title}</h1><div className="mt-6"><AuthNotice error={error} /></div><form onSubmit={create} className="mt-6 flex max-w-xl gap-2"><input name="name" required className="h-10 flex-1 rounded-lg border bg-background px-3" placeholder="Name" /><Button disabled={isPending}>Create</Button></form><div className="mt-6 grid gap-2">{items.map((item) => <div key={item.id} className="flex items-center justify-between rounded-2xl border p-3"><span>{item.name}</span><Button variant="outline" disabled={isPending} onClick={() => remove(item.id)}>Delete</Button></div>)}</div></section>
+
+  function create(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const name = new FormData(event.currentTarget).get("name")
+    startTransition(async () => { await clientAction(endpoint, "POST", { name }); (event.target as HTMLFormElement).reset(); load() })
+  }
+
+  function startEdit(item: Category | Keyword) {
+    setEditingId(item.id)
+    setEditName(item.name)
+  }
+
+  function saveEdit(id: string) {
+    startTransition(async () => {
+      await clientAction(`${endpoint}/${id}`, "PATCH", { name: editName })
+      setEditingId(null)
+      load()
+    })
+  }
+
+  function remove(id: string) {
+    startTransition(async () => { await clientAction(`${endpoint}/${id}`, "DELETE"); load() })
+  }
+
+  return (
+    <section className="rounded-3xl border bg-card p-8">
+      <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
+      <div className="mt-6"><AuthNotice error={error} /></div>
+      <form onSubmit={create} className="mt-6 flex max-w-xl gap-2">
+        <input name="name" required className="h-10 flex-1 rounded-lg border bg-background px-3" placeholder="Name" />
+        <Button disabled={isPending}>Create</Button>
+      </form>
+      <div className="mt-6 grid gap-2">
+        {items.map((item) => (
+          <div key={item.id} className="flex items-center gap-2 rounded-xl border p-3">
+            {editingId === item.id ? (
+              <>
+                <input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="h-8 flex-1 rounded border bg-background px-2 text-sm"
+                  autoFocus
+                />
+                <Button size="sm" disabled={isPending} onClick={() => saveEdit(item.id)}>Save</Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1">{item.name}</span>
+                <Button variant="outline" size="sm" disabled={isPending} onClick={() => startEdit(item)}>Rename</Button>
+                <Button variant="outline" size="sm" disabled={isPending} onClick={() => remove(item.id)}>Delete</Button>
+              </>
+            )}
+          </div>
+        ))}
+        {!items.length && !error && <p className="text-sm text-muted-foreground">No {title.toLowerCase()} yet.</p>}
+      </div>
+    </section>
+  )
 }

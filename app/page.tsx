@@ -1,4 +1,4 @@
-import { ArrowRight, Library, Search, ShieldCheck } from "lucide-react"
+import { ArrowRight, BookMarked, Library, Quote, Search } from "lucide-react"
 import Link from "next/link"
 
 import { ResearchCard } from "@/components/features/research-card"
@@ -8,9 +8,22 @@ import { Button } from "@/components/ui/button"
 import { getRecentResearch } from "@/lib/api"
 import type { ResearchSummary } from "@/types/api"
 
-const featureCards = [
-  { title: "Search", body: "PostgreSQL full-text search with filters and pagination", icon: Search },
-  { title: "Collections", body: "Save useful papers after signing in", icon: Library },
+const features = [
+  {
+    icon: Search,
+    label: "Full-text search",
+    sub: "By title, author, keyword, or category",
+  },
+  {
+    icon: Library,
+    label: "Save to collections",
+    sub: "Bookmark papers and build your reading list",
+  },
+  {
+    icon: Quote,
+    label: "Export citations",
+    sub: "APA, MLA, Chicago, and IEEE formats",
+  },
 ]
 
 async function loadRecentResearch() {
@@ -26,41 +39,82 @@ export default async function Page() {
 
   return (
     <PublicShell>
-      <section className="relative overflow-hidden border-b">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,var(--muted),transparent_35%),linear-gradient(135deg,transparent,rgba(0,0,0,0.04))]" />
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-24">
-          <div className="flex flex-col justify-center">
-            <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border bg-background/70 px-3 py-1 text-xs font-medium text-muted-foreground">
-              <ShieldCheck className="size-3.5" /> Backend-ready academic repository
-            </div>
-            <h1 className="max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
-              Discover, request, and cite NCF research without the old file bottlenecks.
-            </h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-              Search approved papers by title, author, category, or keyword. Public PDFs open through presigned links, while private files use the request workflow.
-            </p>
-            <div className="mt-8 max-w-2xl">
-              <SearchForm />
-            </div>
+      {/* ── Hero ── */}
+      <section className="bg-gradient-to-br from-primary to-primary/85 text-primary-foreground">
+        <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+          <p
+            className="animate-fade-up mb-5 text-xs font-semibold uppercase tracking-widest text-primary-foreground/50"
+            style={{ animationDelay: "0ms" }}
+          >
+            Naga College Foundation · College of Computer Studies
+          </p>
+          <h1
+            className="animate-fade-up font-heading max-w-3xl text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl"
+            style={{ animationDelay: "80ms" }}
+          >
+            CCS Research,<br className="hidden sm:block" /> centralized.
+          </h1>
+          <p
+            className="animate-fade-up mt-6 max-w-xl text-base leading-7 text-primary-foreground/70 sm:text-lg"
+            style={{ animationDelay: "160ms" }}
+          >
+            Discover and cite approved theses and papers from NCF's College of Computer Studies. Public PDFs open instantly — private files available on request.
+          </p>
+          <div
+            className="animate-fade-up mt-10 max-w-2xl"
+            style={{ animationDelay: "240ms" }}
+          >
+            <SearchForm />
           </div>
+          <div
+            className="animate-fade-up mt-6"
+            style={{ animationDelay: "320ms" }}
+          >
+            <Button variant="ghost" className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 px-0 transition-colors duration-200" asChild>
+              <Link href="/search">
+                Browse all papers <ArrowRight className="ml-1 size-4" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
 
-          <div className="grid content-center gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-            {featureCards.map(({ title, body, icon: Icon }) => (
-              <div key={title} className="rounded-3xl border bg-card p-6 shadow-sm">
-                <Icon className="mb-6 size-7 text-primary" />
-                <h2 className="font-semibold">{title}</h2>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">{body}</p>
+      {/* ── Feature strip ── */}
+      <section className="border-b bg-secondary">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            {features.map(({ icon: Icon, label, sub }, i) => (
+              <div
+                key={label}
+                className="animate-fade-up flex items-center gap-4 py-5 sm:px-8 first:sm:pl-0 last:sm:pr-0"
+                style={{ animationDelay: `${400 + i * 60}ms` }}
+              >
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 transition-colors duration-200 group-hover:bg-primary/20">
+                  <Icon className="size-4 text-primary" />
+                </span>
+                <div>
+                  <p className="font-heading text-sm font-semibold">{label}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
+      {/* ── Recent papers ── */}
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div
+          className="animate-fade-up mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
+          style={{ animationDelay: "200ms" }}
+        >
           <div>
-            <p className="text-sm font-medium text-muted-foreground">Recent / Featured Research</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight">Browse the latest approved papers</h2>
+            <p className="font-mono text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              Latest from the archive
+            </p>
+            <h2 className="font-heading mt-2 text-3xl font-bold tracking-tight">
+              Recently approved papers
+            </h2>
           </div>
           <Button variant="outline" asChild>
             <Link href="/search">
@@ -71,13 +125,23 @@ export default async function Page() {
 
         {recent.data.length ? (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {recent.data.map((research) => (
-              <ResearchCard key={research.id} research={research} />
+            {recent.data.map((research, i) => (
+              <div
+                key={research.id}
+                className="animate-fade-up"
+                style={{ animationDelay: `${300 + i * 60}ms` }}
+              >
+                <ResearchCard research={research} />
+              </div>
             ))}
           </div>
         ) : (
-          <div className="rounded-3xl border border-dashed p-10 text-center text-muted-foreground">
-            No approved research is available yet. Start the backend and seed data to populate this section.
+          <div className="animate-fade-in rounded-xl border border-dashed p-12 text-center" style={{ animationDelay: "300ms" }}>
+            <BookMarked className="mx-auto mb-3 size-8 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">No approved papers yet. Submit the first one.</p>
+            <Button variant="outline" className="mt-4" asChild>
+              <Link href="/upload">Submit a paper</Link>
+            </Button>
           </div>
         )}
       </section>
