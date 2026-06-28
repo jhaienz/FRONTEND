@@ -3,8 +3,8 @@ import { Pagination } from "@/components/features/pagination"
 import { ResearchCard } from "@/components/features/research-card"
 import { PublicShell } from "@/components/layout/public-shell"
 import { Button } from "@/components/ui/button"
-import { getCategories, searchResearch } from "@/lib/api"
-import type { Category, ResearchSummary } from "@/types/api"
+import { getCategories, getKeywords, searchResearch } from "@/lib/api"
+import type { Category, Keyword, ResearchSummary } from "@/types/api"
 
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>
@@ -36,12 +36,21 @@ async function loadCategories() {
   }
 }
 
+async function loadKeywords() {
+  try {
+    return await getKeywords()
+  } catch {
+    return [] as Keyword[]
+  }
+}
+
 export default async function SearchPage({ searchParams }: PageProps) {
   const raw = await searchParams
   const page = Number(value(raw.page) ?? 1)
   const params = {
     q: value(raw.q),
     category: value(raw.category),
+    keyword: value(raw.keyword),
     author: value(raw.author),
     dateFrom: value(raw.dateFrom),
     dateTo: value(raw.dateTo),
@@ -54,7 +63,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
     if (val !== undefined && val !== "") queryString.set(key, String(val))
   })
 
-  const [results, categories] = await Promise.all([loadSearch(params), loadCategories()])
+  const [results, categories, keywords] = await Promise.all([loadSearch(params), loadCategories(), loadKeywords()])
 
   return (
     <PublicShell>
@@ -76,6 +85,17 @@ export default async function SearchPage({ searchParams }: PageProps) {
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm">
+              Keyword
+              <select name="keyword" defaultValue={params.keyword ?? ""} className="h-10 rounded-lg border bg-background px-3">
+                <option value="">All keywords</option>
+                {keywords.map((kw) => (
+                  <option key={kw.id} value={kw.name}>
+                    {kw.name}
                   </option>
                 ))}
               </select>
