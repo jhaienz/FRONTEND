@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowLeft, Download, Eye, FileText, Quote } from "lucide-react"
 import { notFound } from "next/navigation"
@@ -6,9 +7,23 @@ import { Button } from "@/components/ui/button"
 import { PublicShell } from "@/components/layout/public-shell"
 import { getResearch } from "@/lib/api"
 import { ResearchActions } from "@/components/features/research-actions"
+import { CitationGenerator } from "@/components/features/citation-generator"
 
 type PageProps = {
   params: Promise<{ id: string }>
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  try {
+    const { id } = await params
+    const research = await getResearch(id)
+    return {
+      title: research.title,
+      description: research.abstract?.slice(0, 160) ?? undefined,
+    }
+  } catch {
+    return { title: "Research" }
+  }
 }
 
 function formatDate(value?: string | null) {
@@ -28,7 +43,7 @@ export default async function ResearchDetailPage({ params }: PageProps) {
 
   const authorLine = research.authors?.map((author) => author.name).join(", ") || "Unknown authors"
   const isPrivate = research.filePrivacy === "private"
-  const citation = `${authorLine}. (${research.publishDate?.slice(0, 4) ?? "n.d."}). ${research.title}.`
+  const citationYear = research.publishDate?.slice(0, 4) ?? "n.d."
 
   return (
     <PublicShell>
@@ -71,7 +86,7 @@ export default async function ResearchDetailPage({ params }: PageProps) {
             </div>
           </div>
 
-          <ResearchActions researchId={research.id} isPrivate={isPrivate} citation={citation} />
+          <ResearchActions researchId={research.id} isPrivate={isPrivate} citation={`${authorLine}. (${citationYear}). ${research.title}.`} />
         </div>
 
         <section className="mt-8 rounded-3xl border bg-card p-6 sm:p-8">
@@ -97,17 +112,8 @@ export default async function ResearchDetailPage({ params }: PageProps) {
 
         <section className="mt-8 rounded-3xl border bg-card p-6 sm:p-8">
           <h2 className="text-xl font-semibold">Citation Generator</h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-[180px_1fr_auto]">
-            <select className="h-10 rounded-lg border bg-background px-3">
-              <option>APA</option>
-              <option>MLA</option>
-              <option>Chicago</option>
-              <option>IEEE</option>
-            </select>
-            <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-              {citation}
-            </div>
-            <Button variant="outline">Copy from Cite</Button>
+          <div className="mt-4">
+            <CitationGenerator authors={authorLine} year={citationYear} title={research.title} />
           </div>
         </section>
       </article>

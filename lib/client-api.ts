@@ -11,6 +11,8 @@ async function parseError(response: Response) {
   }
 }
 
+// All requests go through /api/backend proxy (same-origin → no CORS).
+// The proxy attaches the auth cookie if present; public endpoints work without it.
 async function authenticatedRequest<T>(path: string, options: RequestInit & { query?: Record<string, string | number | undefined | null> } = {}) {
   const url = new URL(`/api/backend${path}`, window.location.origin)
   Object.entries(options.query ?? {}).forEach(([key, value]) => {
@@ -51,4 +53,11 @@ export async function clientAction<T>(path: string, method: string, body?: unkno
     method,
     body: body === undefined ? undefined : JSON.stringify(body),
   })
+}
+
+// For public endpoints that don't require auth — still routes through the proxy
+// to avoid CORS, but omits content-type for GET requests.
+export async function clientPublicGet<T>(path: string, query?: Record<string, string | number | undefined | null>) {
+  const response = await authenticatedRequest<ApiEnvelope<T>>(path, { query })
+  return response.data
 }

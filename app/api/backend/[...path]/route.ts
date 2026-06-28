@@ -3,30 +3,23 @@ import { NextRequest, NextResponse } from "next/server"
 import { API_ROOT } from "@/lib/api"
 import { getAccessToken, refreshAccessToken } from "@/lib/server-auth"
 
-type RouteContext = {
-  params: Promise<{ path: string[] }>
-}
-
 const methodsWithBody = new Set(["POST", "PUT", "PATCH", "DELETE"])
 
-async function proxy(request: NextRequest, context: RouteContext) {
-  const { path } = await context.params
+async function proxy(request: NextRequest, context: { params: Promise<unknown> }) {
+  const { path } = (await context.params) as { path: string[] }
   const target = new URL(`${API_ROOT}/${path.join("/")}`)
   request.nextUrl.searchParams.forEach((value, key) => target.searchParams.set(key, value))
 
   const cookieCarrier = NextResponse.json({})
   const token = await getAccessToken()
-  if (!token) {
-    return NextResponse.json({ statusCode: 401, message: "Sign in required" }, { status: 401 })
-  }
 
   const body = methodsWithBody.has(request.method) ? await request.text() : undefined
-  const makeBackendRequest = (accessToken: string) =>
+  const makeBackendRequest = (accessToken: string | null) =>
     fetch(target, {
       method: request.method,
       headers: {
         "Content-Type": request.headers.get("content-type") ?? "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body,
       cache: "no-store",
@@ -34,7 +27,8 @@ async function proxy(request: NextRequest, context: RouteContext) {
 
   let backendResponse = await makeBackendRequest(token)
 
-  if (backendResponse.status === 401) {
+  // Only attempt token refresh if we had a token that the backend rejected
+  if (backendResponse.status === 401 && token) {
     const refreshed = await refreshAccessToken(cookieCarrier)
     if (!refreshed) {
       return NextResponse.json({ statusCode: 401, message: "Session expired. Sign in again." }, { status: 401 })

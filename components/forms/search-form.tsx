@@ -8,8 +8,6 @@ import { Mic, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { SearchSuggestions } from "@/types/api"
 
-const API_ROOT = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/api`
-
 export function SearchForm({ compact = false, defaultValue = "" }: { compact?: boolean; defaultValue?: string }) {
   const router = useRouter()
   const [query, setQuery] = useState(defaultValue)
@@ -24,9 +22,10 @@ export function SearchForm({ compact = false, defaultValue = "" }: { compact?: b
     const controller = new AbortController()
     const timeout = window.setTimeout(async () => {
       try {
-        const response = await fetch(`${API_ROOT}/search/suggestions?q=${encodeURIComponent(query)}`, {
-          signal: controller.signal,
-        })
+        const response = await fetch(
+          `/api/backend/search/suggestions?q=${encodeURIComponent(query)}`,
+          { signal: controller.signal },
+        )
         if (!response.ok) return
         const payload = (await response.json()) as { data: SearchSuggestions }
         setSuggestions(payload.data)

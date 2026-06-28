@@ -4,8 +4,7 @@ import Link from "next/link"
 import { useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
-import { apiRequest } from "@/lib/api"
-import type { ApiEnvelope } from "@/types/api"
+import { clientAction } from "@/lib/client-api"
 
 type VerifyEmailFormProps = {
   initialEmail: string
@@ -26,11 +25,8 @@ export function VerifyEmailForm({ initialEmail }: VerifyEmailFormProps) {
 
     startVerifyTransition(async () => {
       try {
-        const response = await apiRequest<ApiEnvelope<{ message: string }>>("/auth/verify-email", {
-          method: "POST",
-          body: JSON.stringify({ email, code }),
-        })
-        setMessage(response.data.message)
+        const response = await clientAction<{ message: string }>("/auth/verify-email", "POST", { email, code })
+        setMessage(response.message)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unable to verify email")
       }
@@ -43,11 +39,8 @@ export function VerifyEmailForm({ initialEmail }: VerifyEmailFormProps) {
 
     startResendTransition(async () => {
       try {
-        const response = await apiRequest<ApiEnvelope<{ message: string }>>("/auth/resend-verification-code", {
-          method: "POST",
-          body: JSON.stringify({ email }),
-        })
-        setMessage(response.data.message)
+        const response = await clientAction<{ message: string }>("/auth/resend-verification-code", "POST", { email })
+        setMessage(response.message)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unable to resend code")
       }

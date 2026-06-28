@@ -4,9 +4,7 @@ import Link from "next/link"
 import { useEffect, useRef, useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
-import { apiRequest, getEnvelope } from "@/lib/api"
-import { clientAction } from "@/lib/client-api"
-import type { ApiEnvelope } from "@/types/api"
+import { clientAction, clientEnvelope } from "@/lib/client-api"
 
 export function ResearchActions({
   researchId,
@@ -26,10 +24,7 @@ export function ResearchActions({
   useEffect(() => {
     if (trackedView.current) return
     trackedView.current = true
-    void apiRequest<ApiEnvelope<{ message: string }>>(`/research/${researchId}/view`, {
-      method: "POST",
-      cache: "no-store",
-    }).catch(() => {})
+    void clientAction<{ message: string }>(`/research/${researchId}/view`, "POST").catch(() => {})
   }, [researchId])
 
   function downloadPdf() {
@@ -37,12 +32,9 @@ export function ResearchActions({
     setMessage(null)
     startTransition(async () => {
       try {
-        const { url } = await getEnvelope<{ url: string }>(`/research/${researchId}/pdf`, { cache: "no-store" })
+        const { url } = await clientEnvelope<{ url: string }>(`/research/${researchId}/pdf`)
         setPdfUrl(url)
-        await apiRequest<ApiEnvelope<{ message: string }>>(`/research/${researchId}/download`, {
-          method: "POST",
-          cache: "no-store",
-        })
+        void clientAction<{ message: string }>(`/research/${researchId}/download`, "POST").catch(() => {})
         window.open(url, "_blank", "noopener,noreferrer")
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unable to open PDF")
@@ -68,10 +60,7 @@ export function ResearchActions({
     setMessage(null)
     startTransition(async () => {
       try {
-        await apiRequest<ApiEnvelope<{ message: string }>>(`/research/${researchId}/cite`, {
-          method: "POST",
-          cache: "no-store",
-        })
+        void clientAction<{ message: string }>(`/research/${researchId}/cite`, "POST").catch(() => {})
         await navigator.clipboard.writeText(citation)
         setMessage("Citation copied")
       } catch (err) {

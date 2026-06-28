@@ -1,7 +1,9 @@
 import Link from "next/link"
+import { cookies } from "next/headers"
 import { BookOpen, Search } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { USER_ROLE_COOKIE } from "@/lib/auth-cookies"
 
 const navItems = [
   { href: "/search", label: "Search" },
@@ -9,7 +11,9 @@ const navItems = [
   { href: "/categories", label: "Categories" },
 ]
 
-export function Navbar() {
+export async function Navbar() {
+  const role = (await cookies()).get(USER_ROLE_COOKIE)?.value ?? null
+
   return (
     <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
@@ -34,9 +38,20 @@ export function Navbar() {
               <Search className="size-4" />
             </Link>
           </Button>
-          <Button variant="outline" asChild>
-            <Link href="/login">Sign In</Link>
-          </Button>
+          {role ? (
+            <>
+              <Button variant="ghost" asChild>
+                <Link href={role === "admin" ? "/admin" : "/dashboard"}>Dashboard</Link>
+              </Button>
+              <form action="/api/auth/logout" method="POST">
+                <Button variant="outline" type="submit">Sign Out</Button>
+              </form>
+            </>
+          ) : (
+            <Button variant="outline" asChild>
+              <Link href="/login">Sign In</Link>
+            </Button>
+          )}
         </div>
       </div>
     </header>

@@ -25,6 +25,11 @@ export function UploadResearchForm() {
       return
     }
 
+    if (file.size > 50 * 1024 * 1024) {
+      setError("PDF must be 50 MB or smaller.")
+      return
+    }
+
     startTransition(async () => {
       try {
         const authors = String(form.get("authors") ?? "")

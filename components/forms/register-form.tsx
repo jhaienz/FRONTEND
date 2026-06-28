@@ -5,8 +5,8 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
-import { apiRequest, getEnvelope } from "@/lib/api"
-import type { ApiEnvelope, Category } from "@/types/api"
+import { clientAction, clientPublicGet } from "@/lib/client-api"
+import type { Category } from "@/types/api"
 
 type Option = Pick<Category, "id" | "name">
 
@@ -19,7 +19,7 @@ export function RegisterForm() {
   const [isPending, startTransition] = useTransition()
 
   useEffect(() => {
-    Promise.all([getEnvelope<Option[]>("/institutions"), getEnvelope<Option[]>("/programs")])
+    Promise.all([clientPublicGet<Option[]>("/institutions"), clientPublicGet<Option[]>("/programs")])
       .then(([nextInstitutions, nextPrograms]) => {
         setInstitutions(nextInstitutions)
         setPrograms(nextPrograms)
@@ -53,11 +53,8 @@ export function RegisterForm() {
           institutionId: form.get("institutionId") || undefined,
           programId: form.get("programId") || undefined,
         }
-        const response = await apiRequest<ApiEnvelope<{ message: string }>>("/auth/register", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        })
-        setMessage(response.data.message)
+        const response = await clientAction<{ message: string }>("/auth/register", "POST", payload)
+        setMessage(response.message)
         router.push(`/verify-email?email=${encodeURIComponent(email)}`)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unable to register")

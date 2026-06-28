@@ -242,7 +242,15 @@ export function AdminResearchPanel() {
   const [isPending, startTransition] = useTransition()
   function load() { clientPaginated<ResearchSummary>("/research/pending").then((response) => setPapers(response.data)).catch((err: unknown) => setError(err instanceof Error ? err.message : "Unable to load pending research")) }
   useEffect(load, [])
-  function decide(id: string, action: "approve" | "reject") { startTransition(async () => { await clientAction(`/research/${id}/${action}`, "PATCH", action === "reject" ? { reason: "Rejected by administrator." } : undefined); load() }) }
+  function decide(id: string, action: "approve" | "reject") {
+    if (action === "reject") {
+      const reason = window.prompt("Rejection reason:")
+      if (!reason?.trim()) return
+      startTransition(async () => { await clientAction(`/research/${id}/reject`, "PATCH", { reason }); load() })
+    } else {
+      startTransition(async () => { await clientAction(`/research/${id}/approve`, "PATCH"); load() })
+    }
+  }
   return <section className="rounded-3xl border bg-card p-8"><h1 className="text-3xl font-semibold tracking-tight">Manage Research</h1><div className="mt-6"><AuthNotice error={error} /></div><div className="mt-6 grid gap-3">{papers.map((paper) => <div key={paper.id} className="rounded-2xl border p-4"><h2 className="font-medium">{paper.title}</h2><p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{paper.abstract}</p><div className="mt-4 flex gap-2"><Button disabled={isPending} onClick={() => decide(paper.id, "approve")}>Approve</Button><Button variant="outline" disabled={isPending} onClick={() => decide(paper.id, "reject")}>Reject</Button></div></div>)}</div></section>
 }
 

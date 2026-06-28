@@ -3,8 +3,7 @@
 import { useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
-import { apiRequest } from "@/lib/api"
-import type { ApiEnvelope } from "@/types/api"
+import { clientAction } from "@/lib/client-api"
 
 export function ForgotPasswordForm() {
   const [step, setStep] = useState<1 | 2 | 3>(1)
@@ -19,8 +18,8 @@ export function ForgotPasswordForm() {
     setMessage(null)
     startTransition(async () => {
       try {
-        const response = await apiRequest<ApiEnvelope<unknown>>(path, { method: "POST", body: JSON.stringify(body) })
-        onSuccess(response.data)
+        const data = await clientAction<unknown>(path, "POST", body)
+        onSuccess(data)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Request failed")
       }
