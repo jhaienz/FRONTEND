@@ -48,6 +48,15 @@ function StatGrid({ overview }: { overview: AnalyticsOverview | null }) {
 
 type UploadsByRole = { role: string; uploads: number }
 
+type AuditLogEntry = {
+  id: string
+  action: "approve" | "reject" | "delete"
+  createdAt: string
+  admin: { firstName: string; lastName: string } | null
+  research: { id: string; title: string } | null
+  meta: { reason?: string } | null
+}
+
 export function AnalyticsPanel({ admin = false }: { admin?: boolean }) {
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
   const [trend, setTrend] = useState<AnalyticsPoint[]>([])
@@ -822,6 +831,58 @@ export function TaxonomyManager({ title, endpoint }: { title: string; endpoint: 
           </div>
         ))}
         {!items.length && !error && <p className="text-sm text-muted-foreground">No {title.toLowerCase()} yet.</p>}
+      </div>
+    </section>
+  )
+}
+
+const ACTION_STYLES: Record<string, string> = {
+  approve: "text-green-700 bg-green-50 border-green-200",
+  reject: "text-red-700 bg-red-50 border-red-200",
+  delete: "text-gray-700 bg-gray-50 border-gray-200",
+}
+
+export function AuditLogPanel() {
+  const [entries, setEntries] = useState<AuditLogEntry[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    clientPaginated<AuditLogEntry>("/audit-logs", 1, 50)
+      .then((r) => setEntries(r.data))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Unable to load audit log"))
+  }, [])
+
+  return (
+    <section className="rounded-3xl border bg-card p-8">
+      <h1 className="text-3xl font-semibold tracking-tight">Audit Log</h1>
+      <p className="mt-2 text-sm text-muted-foreground">All admin actions on research papers.</p>
+      <div className="mt-6"><AuthNotice error={error} /></div>
+      <div className="mt-6 grid gap-3">
+        {entries.map((entry) => (
+          <div key={entry.id} className="rounded-xl border bg-background p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold capitalize ${ACTION_STYLES[entry.action] ?? ""}`}>
+                {entry.action}
+              </span>
+              <span className="text-sm font-medium">
+                {entry.admin ? `${entry.admin.firstName} ${entry.admin.lastName}` : "Unknown admin"}
+              </span>
+              <span className="text-sm text-muted-foreground">→</span>
+              <span className="text-sm">
+                {entry.research ? entry.research.title : "Deleted paper"}
+              </span>
+            </div>
+            {entry.meta?.reason && (
+              <p className="mt-2 text-xs text-muted-foreground">Reason: {entry.meta.reason}</p>
+            )}
+            <p className="mt-1 text-xs text-muted-foreground">
+              {new Date(entry.createdAt).toLocaleString()}
+            </p>
+          </div>
+        ))}
+        {!entries.length && !error && (
+          <p className="text-sm text-muted-foreground">No audit entries yet.</p>
+        )}
       </div>
     </section>
   )

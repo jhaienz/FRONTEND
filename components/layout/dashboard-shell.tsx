@@ -16,6 +16,7 @@ const adminLinks = [
   ["/admin", "Overview"],
   ["/admin/research", "Research"],
   ["/admin/users", "Users"],
+  ["/admin/audit", "Audit Log"],
   ["/admin/categories", "Categories"],
   ["/admin/keywords", "Keywords"],
   ["/admin/institutions", "Institutions"],
