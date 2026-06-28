@@ -337,6 +337,9 @@ export function SettingsPanel() {
   const [picError, setPicError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [isPicPending, startPicTransition] = useTransition()
+  const [pwMessage, setPwMessage] = useState<string | null>(null)
+  const [pwError, setPwError] = useState<string | null>(null)
+  const [isPwPending, startPwTransition] = useTransition()
 
   useEffect(() => {
     clientEnvelope<UserProfile>("/users/me")
@@ -421,6 +424,59 @@ export function SettingsPanel() {
           <Button disabled={isPending} className="w-fit">Save changes</Button>
         </form>
       )}
+
+      {/* Change password */}
+      <div className="mt-8 border-t pt-8">
+        <h2 className="font-semibold">Change Password</h2>
+        <form
+          className="mt-4 grid max-w-sm gap-4"
+          onSubmit={(e) => {
+            e.preventDefault()
+            const form = new FormData(e.currentTarget)
+            const currentPassword = String(form.get("currentPassword") ?? "")
+            const newPassword = String(form.get("newPassword") ?? "")
+            const confirm = String(form.get("confirmPassword") ?? "")
+            setPwError(null)
+            setPwMessage(null)
+
+            if (newPassword !== confirm) {
+              setPwError("New passwords do not match.")
+              return
+            }
+
+            startPwTransition(async () => {
+              try {
+                const res = await clientAction<{ message: string }>("/auth/change-password", "PATCH", {
+                  currentPassword,
+                  newPassword,
+                })
+                setPwMessage(res.message)
+                ;(e.target as HTMLFormElement).reset()
+              } catch (err) {
+                setPwError(err instanceof Error ? err.message : "Password change failed")
+              }
+            })
+          }}
+        >
+          <label className="grid gap-2 text-sm">
+            Current Password
+            <input name="currentPassword" type="password" required className="h-10 rounded-lg border bg-background px-3" />
+          </label>
+          <label className="grid gap-2 text-sm">
+            New Password
+            <input name="newPassword" type="password" required minLength={8} className="h-10 rounded-lg border bg-background px-3" />
+          </label>
+          <label className="grid gap-2 text-sm">
+            Confirm New Password
+            <input name="confirmPassword" type="password" required minLength={8} className="h-10 rounded-lg border bg-background px-3" />
+          </label>
+          {pwError && <p className="text-sm text-destructive">{pwError}</p>}
+          {pwMessage && <p className="text-sm text-muted-foreground">{pwMessage}</p>}
+          <Button type="submit" variant="outline" disabled={isPwPending} className="w-fit">
+            {isPwPending ? "Changing…" : "Change Password"}
+          </Button>
+        </form>
+      </div>
     </section>
   )
 }
