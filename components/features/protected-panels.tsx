@@ -673,9 +673,23 @@ export function AdminResearchPanel({ statusFilter = "" }: { statusFilter?: strin
     if (action === "reject") {
       const reason = window.prompt("Rejection reason:")
       if (!reason?.trim()) return
-      startTransition(async () => { await clientAction(`/research/${id}/reject`, "PATCH", { reason }); load(activeStatus) })
+      startTransition(async () => {
+        try {
+          await clientAction(`/research/${id}/reject`, "PATCH", { reason })
+          load(activeStatus)
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Reject failed")
+        }
+      })
     } else {
-      startTransition(async () => { await clientAction(`/research/${id}/approve`, "PATCH"); load(activeStatus) })
+      startTransition(async () => {
+        try {
+          await clientAction(`/research/${id}/approve`, "PATCH")
+          load(activeStatus)
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Approve failed")
+        }
+      })
     }
   }
 
