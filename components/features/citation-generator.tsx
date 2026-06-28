@@ -1,59 +1,106 @@
 "use client"
 
 import { useState } from "react"
+
 import { Button } from "@/components/ui/button"
 
-type CitationData = {
+const FORMATS = {
+  APA: (authors: string, year: string, title: string) =>
+    `${authors}. (${year}). ${title}. NCF College of Computer Studies.`,
+  MLA: (authors: string, _year: string, title: string) =>
+    `${authors}. "${title}." NCF College of Computer Studies.`,
+  Chicago: (authors: string, year: string, title: string) =>
+    `${authors}. "${title}." NCF College of Computer Studies, ${year}.`,
+  IEEE: (authors: string, year: string, title: string) =>
+    `${authors}, "${title}," NCF College of Computer Studies, ${year}.`,
+}
+
+function buildBibtex(authors: string, year: string, title: string): string {
+  const safeYear = year === "n.d." ? new Date().getFullYear().toString() : year
+  const entryKey = `${authors.split(",")[0]?.replace(/\s+/g, "") ?? "Unknown"}${safeYear}`
+    .replace(/[^a-zA-Z0-9_]/g, "")
+
+  return [
+    `@techreport{${entryKey},`,
+    `  author    = {${authors}},`,
+    `  title     = {${title}},`,
+    `  institution = {NCF College of Computer Studies},`,
+    `  year      = {${safeYear}},`,
+    `  type      = {Undergraduate Thesis},`,
+    `}`,
+  ].join("\n")
+}
+
+function downloadBibtex(authors: string, year: string, title: string) {
+  const content = buildBibtex(authors, year, title)
+  const blob = new Blob([content], { type: "text/plain" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  const safeTitle = title.slice(0, 40).replace(/[^a-z0-9]/gi, "-").toLowerCase()
+  a.href = url
+  a.download = `${safeTitle}.bib`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export function CitationGenerator({
+  authors,
+  year,
+  title,
+}: {
   authors: string
   year: string
   title: string
-}
-
-function formatCitation(data: CitationData, format: string): string {
-  const { authors, year, title } = data
-  switch (format) {
-    case "MLA":
-      return `${authors}. "${title}." ${year}.`
-    case "Chicago":
-      return `${authors}. ${year}. "${title}."`
-    case "IEEE":
-      return `${authors}, "${title}," ${year}.`
-    default: // APA
-      return `${authors}. (${year}). ${title}.`
-  }
-}
-
-export function CitationGenerator({ authors, year, title }: CitationData) {
-  const [format, setFormat] = useState("APA")
+}) {
+  const [format, setFormat] = useState<keyof typeof FORMATS>("APA")
   const [copied, setCopied] = useState(false)
 
-  const citation = formatCitation({ authors, year, title }, format)
+  const citation = FORMATS[format](authors, year, title)
 
   function copy() {
-    void navigator.clipboard.writeText(citation).then(() => {
+    navigator.clipboard.writeText(citation).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     })
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-[180px_1fr_auto]">
-      <select
-        value={format}
-        onChange={(e) => setFormat(e.target.value)}
-        className="h-10 rounded-lg border bg-background px-3"
-      >
-        <option>APA</option>
-        <option>MLA</option>
-        <option>Chicago</option>
-        <option>IEEE</option>
-      </select>
-      <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-        {citation}
+    <div className="grid gap-4">
+      {/* Format tabs */}
+      <div className="flex flex-wrap gap-1">
+        {(Object.keys(FORMATS) as Array<keyof typeof FORMATS>).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFormat(f)}
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+              format === f
+                ? "bg-primary text-primary-foreground"
+                : "border hover:bg-muted"
+            }`}
+          >
+            {f}
+          </button>
+        ))}
       </div>
-      <Button variant="outline" onClick={copy}>
-        {copied ? "Copied!" : "Copy"}
-      </Button>
+
+      {/* Citation text */}
+      <pre className="rounded-xl border bg-muted/30 p-4 text-sm leading-6 whitespace-pre-wrap font-mono">
+        {citation}
+      </pre>
+
+      {/* Actions */}
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={copy}>
+          {copied ? "Copied!" : "Copy citation"}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => downloadBibtex(authors, year, title)}
+        >
+          Download .bib
+        </Button>
+      </div>
     </div>
   )
 }
