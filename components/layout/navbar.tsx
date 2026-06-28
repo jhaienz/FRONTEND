@@ -21,7 +21,7 @@ export async function Navbar() {
           <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <BookOpen className="size-4" />
           </span>
-          <span>NCF Research Nexus</span>
+          <span>CCS Research Hub</span>
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">

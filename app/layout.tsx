@@ -7,10 +7,10 @@ import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
   title: {
-    default: "NCF Research Nexus",
-    template: "%s | NCF Research Nexus",
+    default: "CCS Research Hub",
+    template: "%s | CCS Research Hub",
   },
-  description: "Discover, request, and cite academic research from NCF.",
+  description: "Discover, request, and cite academic research from CCS.",
   robots: { index: true, follow: true },
 }
 
