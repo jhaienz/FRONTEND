@@ -5,6 +5,8 @@ import type { ApiEnvelope, PaginatedResponse } from "@/types/api"
 // useEffect calls don't keep hammering the backend with expired tokens.
 let redirecting = false
 
+const REQUEST_TIMEOUT_MS = 15_000
+
 async function parseError(response: Response) {
   try {
     const payload = (await response.json()) as { message?: string | string[] }
@@ -25,24 +27,41 @@ async function authenticatedRequest<T>(path: string, options: RequestInit & { qu
     if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value))
   })
 
-  const { query: _query, headers, ...init } = options
+  const { query: _query, headers, signal: callerSignal, ...init } = options
   void _query
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...headers,
-    },
-    cache: "no-store",
-  })
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort("timeout"), REQUEST_TIMEOUT_MS)
+  if (callerSignal) callerSignal.addEventListener("abort", () => controller.abort())
+
+  let response: Response
+  try {
+    response = await fetch(url, {
+      ...init,
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", ...headers },
+      cache: "no-store",
+    })
+  } catch (err) {
+    clearTimeout(timeoutId)
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiError("Request timed out. Check your connection and try again.", 408)
+    }
+    throw err
+  }
+  clearTimeout(timeoutId)
 
   if (!response.ok) {
+    // Handle before reading body to avoid hanging on a malformed stream.
     if (response.status === 401) {
       if (!redirecting) {
         redirecting = true
         window.location.href = "/login"
       }
       throw new ApiError("Session expired", 401)
+    }
+    if (response.status === 429) {
+      throw new ApiError("Too many requests — please wait a moment and try again.", 429)
     }
     throw new ApiError(await parseError(response), response.status)
   }
