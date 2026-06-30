@@ -1,5 +1,6 @@
 import Link from "next/link"
 
+import { AdminChatbot } from "@/components/features/admin-chatbot"
 import { Navbar } from "@/components/layout/navbar"
 import { NotificationLink } from "@/components/layout/notification-link"
 
@@ -42,6 +43,7 @@ export function DashboardShell({ children, admin = false }: { children: React.Re
         </aside>
         <main>{children}</main>
       </div>
+      {admin && <AdminChatbot />}
     </div>
   )
 }

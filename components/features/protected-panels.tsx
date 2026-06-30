@@ -807,8 +807,8 @@ export function AdminResearchPanel({ statusFilter = "" }: { statusFilter?: strin
               </div>
               <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{paper.abstract}</p>
 
-              {/* AI Assistant — only for pending papers with an abstract */}
-              {paper.status === "pending" && paper.abstract && (
+              {/* AI Assistant — for any paper with an abstract */}
+              {paper.abstract && (
                 <div className="mt-3 border-t pt-3">
                   <p className="mb-2 text-xs font-medium text-muted-foreground">AI Assistant</p>
                   <div className="flex flex-wrap gap-1.5">
@@ -819,13 +819,15 @@ export function AdminResearchPanel({ statusFilter = "" }: { statusFilter?: strin
                     >
                       Summarize
                     </button>
-                    <button
-                      disabled={isAiPending}
-                      onClick={() => runAi(paper, "suggest-rejection")}
-                      className="rounded-lg border bg-background px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-50"
-                    >
-                      Draft rejection
-                    </button>
+                    {paper.status === "pending" && (
+                      <button
+                        disabled={isAiPending}
+                        onClick={() => runAi(paper, "suggest-rejection")}
+                        className="rounded-lg border bg-background px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-50"
+                      >
+                        Draft rejection
+                      </button>
+                    )}
                     <button
                       disabled={isAiPending}
                       onClick={() => runAi(paper, "suggest-tags")}
