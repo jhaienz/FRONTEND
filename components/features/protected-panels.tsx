@@ -21,7 +21,7 @@ function AuthNotice({ error }: { error: string | null }) {
   if (!error) return null
   return (
     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-      {error} <Link href="/login" className="font-medium underline">Sign in</Link>
+      {error}
     </div>
   )
 }

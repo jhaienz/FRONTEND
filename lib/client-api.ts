@@ -31,6 +31,10 @@ async function authenticatedRequest<T>(path: string, options: RequestInit & { qu
   })
 
   if (!response.ok) {
+    if (response.status === 401) {
+      window.location.href = "/login"
+      throw new ApiError("Session expired", 401)
+    }
     throw new ApiError(await parseError(response), response.status)
   }
 
