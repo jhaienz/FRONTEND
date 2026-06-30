@@ -1,6 +1,10 @@
 import { ApiError } from "@/lib/api"
 import type { ApiEnvelope, PaginatedResponse } from "@/types/api"
 
+// Once a 401 triggers a redirect, block all further requests so concurrent
+// useEffect calls don't keep hammering the backend with expired tokens.
+let redirecting = false
+
 async function parseError(response: Response) {
   try {
     const payload = (await response.json()) as { message?: string | string[] }
@@ -14,6 +18,8 @@ async function parseError(response: Response) {
 // All requests go through /api/backend proxy (same-origin → no CORS).
 // The proxy attaches the auth cookie if present; public endpoints work without it.
 async function authenticatedRequest<T>(path: string, options: RequestInit & { query?: Record<string, string | number | undefined | null> } = {}) {
+  if (redirecting) throw new ApiError("Session expired", 401)
+
   const url = new URL(`/api/backend${path}`, window.location.origin)
   Object.entries(options.query ?? {}).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value))
@@ -32,7 +38,10 @@ async function authenticatedRequest<T>(path: string, options: RequestInit & { qu
 
   if (!response.ok) {
     if (response.status === 401) {
-      window.location.href = "/login"
+      if (!redirecting) {
+        redirecting = true
+        window.location.href = "/login"
+      }
       throw new ApiError("Session expired", 401)
     }
     throw new ApiError(await parseError(response), response.status)
