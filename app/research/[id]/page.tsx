@@ -60,7 +60,8 @@ export default async function ResearchDetailPage({ params }: PageProps) {
     ? await loadRelated(primaryCategoryId, research.id)
     : []
 
-  const authorLine = research.authors?.map((author) => author.name).join(", ") || "Unknown authors"
+  const authorList = research.authors ?? []
+  const authorLine = authorList.map((a) => a.name).join(", ") || "Unknown authors"
   const isPrivate = research.filePrivacy === "private"
   const citationYear = research.publishDate?.slice(0, 4) ?? "n.d."
 
@@ -82,7 +83,21 @@ export default async function ResearchDetailPage({ params }: PageProps) {
             ))}
           </div>
           <h1 className="mt-5 text-3xl font-semibold tracking-tight sm:text-5xl">{research.title}</h1>
-          <p className="mt-4 text-muted-foreground">Authors: {authorLine}</p>
+          <p className="mt-4 text-muted-foreground">
+            Authors:{" "}
+            {authorList.length > 0 ? (
+              authorList.map((a, i) => (
+                <span key={a.id}>
+                  {i > 0 && ", "}
+                  <Link href={`/authors/${a.id}`} className="hover:text-foreground hover:underline">
+                    {a.name}
+                  </Link>
+                </span>
+              ))
+            ) : (
+              "Unknown authors"
+            )}
+          </p>
           <p className="mt-1 text-sm text-muted-foreground">Published: {formatDate(research.publishDate)}</p>
 
           {research.rejectionReason && (
